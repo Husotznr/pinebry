@@ -304,6 +304,7 @@
         let currentFilter = 'all';
         let allPosts = [];
 
+        // KATEGORİLER
         const categories = [
             { id: 'all', name: 'Tümü', color: '#666' },
             { id: 'manga-anime', name: 'Anime', color: '#ff9ff3' },
@@ -324,8 +325,12 @@
                             avatar: userData ? userData.avatar : "https://ui-avatars.com/api/?name=" + user.email + "&background=random",
                             isAdmin: false
                         };
-                        // ADMIN KONTROLU
+                        // Admin Kontrolü
                         if(currentUser.username === "huso") currentUser.isAdmin = true;
+                        
+                        try {
+                            localStorage.setItem('pb_currentUser', JSON.stringify(currentUser));
+                        } catch (e) { console.warn("Lokal hafıza dolu."); }
                         
                         checkAuthUI();
                     });
@@ -336,6 +341,7 @@
                 }
             });
 
+            // Postları Dinle
             db.ref('posts').on('value', (snapshot) => {
                 const data = snapshot.val();
                 allPosts = [];
@@ -349,6 +355,37 @@
             });
         };
 
+        // --- YARDIMCI FONKSİYON: RESİM KÜÇÜLTME ---
+        // Bu fonksiyon büyük resimleri alır, tarayıcıda küçültür ve hızlıca yükler.
+        function resizeImage(file, maxWidth, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Resmi JPEG formatında ve 0.7 kalitesinde sıkıştır
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    callback(dataUrl);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- AUTH & UI ---
         function togglePassword(inputId, icon) {
             const input = document.getElementById(inputId);
             if(input.type === "password") {
@@ -365,8 +402,8 @@
 
             if (currentUser) {
                 profileCard.style.display = 'block';
-                if(currentUser.isAdmin) adminBtn.style.display = 'block';
-                else adminBtn.style.display = 'none';
+                if(currentUser.isAdmin && adminBtn) adminBtn.style.display = 'block';
+                else if(adminBtn) adminBtn.style.display = 'none';
 
                 updateProfileUI();
                 createContainer.innerHTML = `
@@ -387,10 +424,17 @@
                         <button class="btn-publish" onclick="addPost()">Paylaş</button>
                     </div>`;
                 
-                document.getElementById('imageInput').addEventListener('change', function() {
-                    const fileName = this.files[0] ? this.files[0].name : '';
-                    document.getElementById('fileNameDisplay').textContent = fileName ? `${fileName} eklendi` : '';
-                });
+                setTimeout(() => {
+                    const imgInput = document.getElementById('imageInput');
+                    if(imgInput) {
+                        imgInput.addEventListener('change', function() {
+                            const fileName = this.files[0] ? this.files[0].name : '';
+                            const display = document.getElementById('fileNameDisplay');
+                            if(display) display.textContent = fileName ? `${fileName} eklendi` : '';
+                        });
+                    }
+                }, 500);
+
             } else {
                 profileCard.style.display = 'none';
                 createContainer.innerHTML = `
@@ -435,43 +479,185 @@
         function logout() { auth.signOut(); }
 
         function updateProfileUI() {
-            document.getElementById('sidebarName').textContent = currentUser.username;
-            document.getElementById('sidebarAvatar').src = currentUser.avatar;
+            if(!currentUser) return;
+            const sName = document.getElementById('sidebarName');
+            const sAvatar = document.getElementById('sidebarAvatar');
+            if(sName) sName.textContent = currentUser.username;
+            if(sAvatar) sAvatar.src = currentUser.avatar;
+            
             const postCount = allPosts.filter(p => p.uid === currentUser.uid).length;
-            document.getElementById('statPosts').textContent = postCount;
+            const pCountEl = document.getElementById('statPosts');
+            if(pCountEl) pCountEl.textContent = postCount;
         }
 
+        // --- GÜNCELLENEN AVATAR DEĞİŞTİRME (RESİZER EKLENDİ) ---
         function changeAvatar() {
             const file = document.getElementById('avatarInput').files[0];
             if(file) {
-                if (file.size > 2000000) return alert("Dosya çok büyük!");
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    db.ref('users/' + currentUser.uid).update({ avatar: e.target.result });
-                    currentUser.avatar = e.target.result;
-                    updateProfileUI();
-                }
-                reader.readAsDataURL(file);
+                // Resizer kullanılıyor: Profil için max genişlik 200px yeterli
+                resizeImage(file, 200, function(resizedDataUrl) {
+                    db.ref('users/' + currentUser.uid).update({ avatar: resizedDataUrl })
+                    .then(() => {
+                        currentUser.avatar = resizedDataUrl;
+                        try { localStorage.setItem('pb_currentUser', JSON.stringify(currentUser)); } catch(e){}
+                        updateProfileUI();
+                        renderFeed(currentFilter);
+                    })
+                    .catch((err) => { alert("Hata: " + err.message); });
+                });
             }
         }
 
+        // --- POST İŞLEMLERİ ---
+        function addPost() {
+            if(!currentUser) { alert("Giriş yapmalısın!"); return; }
+
+            const content = document.getElementById('postContent').value;
+            const catSelect = document.getElementById('postCategorySelect');
+            const fileInput = document.getElementById('imageInput');
+            const isAnon = document.getElementById('anonCheck').checked;
+
+            if (!content.trim()) { alert("Lütfen bir şeyler yaz!"); return; }
+            
+            // Eğer resim seçildiyse onu da küçültüp gönderelim (Max 800px)
+            if (fileInput.files && fileInput.files[0]) {
+                resizeImage(fileInput.files[0], 800, function(resizedImgUrl) {
+                    sendPostToDB(content, catSelect, resizedImgUrl, isAnon);
+                });
+            } else {
+                sendPostToDB(content, catSelect, null, isAnon);
+            }
+        }
+
+        function sendPostToDB(content, catSelect, imgUrl, isAnon) {
+            const now = new Date();
+            const timeStr = now.toLocaleDateString('tr-TR') + ' ' + now.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
+            
+            // Avatar kontrolü (Çok büyükse varsayılan kullan ki sistemi tıkamasın)
+            let safeAvatar = currentUser.avatar;
+            if (!safeAvatar || safeAvatar.length > 100000) { 
+                 // Eğer avatar hala çok büyükse (eski yüklemelerden), ui-avatars kullan
+                 // safeAvatar = "https://ui-avatars.com/api/?name=" + currentUser.username;
+                 // Not: Resize ile artık büyük olmayacak ama önlem iyidir.
+            }
+
+            const newPost = {
+                uid: currentUser.uid, 
+                author: currentUser.username, 
+                avatar: safeAvatar,
+                isAnonymous: isAnon, 
+                category: catSelect.value, 
+                categoryName: catSelect.options[catSelect.selectedIndex].text,
+                content: content, 
+                image: imgUrl, 
+                tags: [], 
+                kudos: 0, 
+                time: timeStr
+            };
+
+            db.ref('posts').push(newPost)
+            .then(() => {
+                document.getElementById('postContent').value = '';
+                const fDisplay = document.getElementById('fileNameDisplay');
+                if(fDisplay) fDisplay.textContent = '';
+                document.getElementById('imageInput').value = '';
+                document.getElementById('anonCheck').checked = false;
+            })
+            .catch((error) => {
+                alert("Mesaj gönderilemedi: " + error.message);
+            });
+        }
+
+        function toggleLike(id) {
+            if(!currentUser) return alert("Giriş yapmalısın!");
+            const uid = currentUser.uid;
+            const postRef = db.ref('posts/' + id);
+            postRef.transaction((post) => {
+                if (post) {
+                    if (post.likes && post.likes[uid]) {
+                        post.kudos = (post.kudos || 1) - 1;
+                        post.likes[uid] = null;
+                    } else {
+                        post.kudos = (post.kudos || 0) + 1;
+                        if (!post.likes) post.likes = {};
+                        post.likes[uid] = true;
+                    }
+                }
+                return post;
+            });
+        }
+
+        function toggleComments(elemId) {
+            const el = document.getElementById(elemId);
+            if(el) el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function addComment(id) {
+            if(!currentUser) return alert("Giriş yapmalısın!");
+            const val = document.getElementById(`c-input-${id}`).value;
+            if(val.trim()){ 
+                db.ref('posts/' + id + '/comments').push({
+                    user: currentUser.username,
+                    text: val
+                });
+            }
+        }
+
+        function editPost(id) {
+            const contentDiv = document.getElementById(`content-${id}`);
+            const btnGroup = document.getElementById(`btn-group-${id}`);
+            const post = allPosts.find(p => p.id === id);
+            
+            if(post) {
+                contentDiv.innerText = post.content; 
+                contentDiv.contentEditable = "true"; 
+                contentDiv.focus();
+                if(btnGroup) btnGroup.style.display = 'block';
+            }
+        }
+
+        function savePost(id) {
+            const contentDiv = document.getElementById(`content-${id}`);
+            db.ref('posts/' + id).update({ content: contentDiv.innerText });
+        }
+
+        function cancelEdit() { renderFeed(currentFilter); }
+        function deletePost(id) { if(confirm("Siliniyor?")) { db.ref('posts/' + id).remove(); } }
+
         function showAdminPanel() {
             const listDiv = document.getElementById('adminUserList');
+            if(!listDiv) return;
+            
             listDiv.innerHTML = "Yükleniyor...";
             document.getElementById('adminOverlay').style.display = 'flex';
+            
             db.ref('users').once('value').then(snapshot => {
                 const users = snapshot.val();
                 listDiv.innerHTML = "";
                 if(users) {
                     Object.values(users).forEach(u => {
-                        listDiv.insertAdjacentHTML('beforeend', `<div class="user-list-item"><img src="${u.avatar}"><span>${u.username}</span></div>`);
+                        let safeImg = u.avatar && u.avatar.length < 5000000 ? u.avatar : "https://ui-avatars.com/api/?name=" + u.username;
+                        listDiv.insertAdjacentHTML('beforeend', `<div class="user-list-item"><img src="${safeImg}"><span>${u.username}</span></div>`);
                     });
                 } else { listDiv.innerHTML = "Kullanıcı yok."; }
             });
         }
 
+        // --- RENDER ---
+        function formatContent(text) {
+            if(!text) return "";
+            let formatted = text.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+            const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w\-]+)(?:\S+)?/g;
+            formatted = formatted.replace(ytRegex, '<div class="video-container"><iframe src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>');
+            const spotifyRegex = /(?:https?:\/\/)?(?:open\.spotify\.com\/)(track|album|playlist)\/([a-zA-Z0-9]+)(?:\?\S+)?/g;
+            formatted = formatted.replace(spotifyRegex, '<iframe style="border-radius:12px; margin-top:10px;" src="https://open.spotify.com/embed/$1/$2" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>');
+            formatted = formatted.replace(/\n/g, '<br>');
+            return formatted;
+        }
+
         function renderCategories() {
             const container = document.getElementById('categoryContainer');
+            if(!container) return;
             container.innerHTML = '';
             categories.forEach(cat => {
                 let count = (cat.id === 'all') ? allPosts.length : allPosts.filter(p => p.category === cat.id).length;
@@ -485,7 +671,9 @@
             currentFilter = filterCategory;
             renderCategories(); 
             const feedArea = document.getElementById('feedArea');
+            if(!feedArea) return;
             feedArea.innerHTML = "";
+            
             const filteredPosts = filterCategory === 'all' ? allPosts : allPosts.filter(p => p.category === filterCategory);
 
             if (filteredPosts.length === 0) { feedArea.innerHTML = `<div style="text-align:center; color:#888;">Henüz gönderi yok.</div>`; return; }
@@ -508,7 +696,6 @@
 
                 const catInfo = categories.find(c => c.id === post.category);
                 const badgeColor = catInfo ? catInfo.color : '#666';
-
                 const isLiked = currentUser && post.likes && post.likes[currentUser.uid];
 
                 let commentsHtml = '';
@@ -533,7 +720,6 @@
                     </div>
 
                     ${post.image ? `<img src="${post.image}" class="post-image">` : ''}
-                    <div class="tags"></div>
                     
                     <div class="post-footer">
                         <div class="actions">
@@ -549,103 +735,11 @@
                     
                     <div id="comment-wrap-${post.id}" class="comments-wrap">
                         ${commentsHtml}
-                        <div class="add-comment-box"><input type="text" id="c-input-${post.id}" placeholder="Yorum ekle..."><button onclick="addComment(${post.id})">Yolla</button></div>
+                        <div class="add-comment-box"><input type="text" id="c-input-${post.id}" placeholder="Yorum ekle..."><button onclick="addComment('${post.id}')">Yolla</button></div>
                     </div>
                 </article>`;
                 feedArea.insertAdjacentHTML('beforeend', postHTML); 
             });
-        }
-
-        function formatContent(text) {
-            let formatted = text.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
-            const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w\-]+)(?:\S+)?/g;
-            formatted = formatted.replace(ytRegex, '<div class="video-container"><iframe src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>');
-            const spotifyRegex = /(?:https?:\/\/)?(?:open\.spotify\.com\/)(track|album|playlist)\/([a-zA-Z0-9]+)(?:\?\S+)?/g;
-            formatted = formatted.replace(spotifyRegex, '<iframe style="border-radius:12px; margin-top:10px;" src="https://open.spotify.com/embed/$1/$2" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>');
-            formatted = formatted.replace(/\n/g, '<br>');
-            return formatted;
-        }
-
-        function editPost(id) {
-            const contentDiv = document.getElementById(`content-${id}`);
-            const btnGroup = document.getElementById(`btn-group-${id}`);
-            const post = allPosts.find(p => p.id === id);
-            contentDiv.innerText = post.content; 
-            contentDiv.contentEditable = "true"; 
-            contentDiv.focus();
-            btnGroup.style.display = 'block';
-        }
-
-        function savePost(id) {
-            const contentDiv = document.getElementById(`content-${id}`);
-            db.ref('posts/' + id).update({ content: contentDiv.innerText });
-        }
-
-        function cancelEdit() { renderFeed(currentFilter); }
-        function deletePost(id) { if(confirm("Siliniyor?")) { db.ref('posts/' + id).remove(); } }
-
-        function toggleLike(id) {
-            if(!currentUser) return alert("Giriş yapmalısın!");
-            const uid = currentUser.uid;
-            const postRef = db.ref('posts/' + id);
-            postRef.transaction((post) => {
-                if (post) {
-                    if (post.likes && post.likes[uid]) {
-                        post.kudos = (post.kudos || 1) - 1;
-                        post.likes[uid] = null;
-                    } else {
-                        post.kudos = (post.kudos || 0) + 1;
-                        if (!post.likes) post.likes = {};
-                        post.likes[uid] = true;
-                    }
-                }
-                return post;
-            });
-        }
-
-        function toggleComments(elemId) {
-            const el = document.getElementById(elemId);
-            el.style.display = el.style.display === 'block' ? 'none' : 'block';
-        }
-
-        function addComment(id) {
-            if(!currentUser) return alert("Giriş yapmalısın!");
-            const val = document.getElementById(`c-input-${id}`).value;
-            if(val.trim()){ 
-                db.ref('posts/' + id + '/comments').push({ user: currentUser.username, text: val });
-            }
-        }
-
-        function addPost() {
-            if(!currentUser) return;
-            const content = document.getElementById('postContent').value;
-            const catSelect = document.getElementById('postCategorySelect');
-            const fileInput = document.getElementById('imageInput');
-            const isAnon = document.getElementById('anonCheck').checked;
-
-            if (!content.trim()) return;
-            
-            let imgUrl = null;
-            if (fileInput.files && fileInput.files[0]) {
-                if (fileInput.files[0].size > 2000000) return alert("Resim çok büyük (Max 2MB)!");
-                const reader = new FileReader();
-                reader.onload = function(e) { sendPostToDB(content, catSelect, e.target.result, isAnon); };
-                reader.readAsDataURL(fileInput.files[0]);
-            } else { sendPostToDB(content, catSelect, null, isAnon); }
-        }
-
-        function sendPostToDB(content, catSelect, imgUrl, isAnon) {
-            const now = new Date();
-            const timeStr = now.toLocaleDateString('tr-TR') + ' ' + now.toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'});
-            const newPost = {
-                uid: currentUser.uid, author: currentUser.username, avatar: currentUser.avatar,
-                isAnonymous: isAnon, category: catSelect.value, categoryName: catSelect.options[catSelect.selectedIndex].text,
-                content: content, image: imgUrl, kudos: 0, time: timeStr
-            };
-            db.ref('posts').push(newPost);
-            document.getElementById('postContent').value = '';
-            document.getElementById('fileNameDisplay').textContent = '';
-            document.getElementById('imageInput').value = '';
         }
 
         function filterPosts(cat) { renderFeed(cat); }
