@@ -326,7 +326,7 @@
                             isAdmin: false
                         };
                         // Admin Kontrolü
-                        if(currentUser.username === "huso") currentUser.isAdmin = true;
+                        if(currentUser.username === "admin") currentUser.isAdmin = true;
                         
                         try {
                             localStorage.setItem('pb_currentUser', JSON.stringify(currentUser));
@@ -746,3 +746,4 @@
     </script>
 </body>
 </html>
+
