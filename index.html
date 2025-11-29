@@ -37,7 +37,7 @@
         /* --- LOGIN MODAL --- */
         #loginOverlay, #adminOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(147, 112, 126, 0.35); /* İstenilen opaklık */
+            background: rgba(147, 112, 126, 0.35);
             z-index: 2000;
             display: flex; justify-content: center; align-items: center;
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -109,12 +109,10 @@
         .tools-left { display: flex; gap: 10px; align-items: center; }
         #postCategorySelect { border:none; background:var(--input-bg); padding:8px 15px; border-radius:25px; color:#555; outline:none; font-weight:600; font-size: 0.9rem; cursor: pointer; }
         
-        /* ANONİM KUTUSU SADELEŞTİRİLDİ */
         .anon-label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #666; cursor: pointer; background: var(--input-bg); padding: 8px 12px; border-radius: 25px; }
         .anon-label input { cursor: pointer; accent-color: var(--christmas-red); }
 
         .tool-btn { background: var(--input-bg); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #666; cursor: pointer; }
-        /* GÜNCELLENDİ: Yeni koyu yeşil rengi kullanılıyor */
         .btn-publish { background: var(--christmas-green); color: white; border: none; padding: 8px 25px; border-radius: 25px; font-weight: bold; font-size: 0.9rem; cursor: pointer; }
         .file-status { font-size: 0.75rem; color: var(--christmas-green); margin-left: 5px; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 
@@ -135,7 +133,6 @@
 
         .inline-edit-actions { text-align: right; margin-top: 5px; display: none; }
         .btn-mini { padding: 5px 12px; border-radius: 12px; border: none; font-size: 0.8rem; cursor: pointer; margin-left: 5px; font-weight: 600; }
-        /* GÜNCELLENDİ: Yeni koyu yeşil rengi kullanılıyor */
         .btn-save { background: var(--christmas-green); color: white; }
         .btn-cancel { background: #ddd; color: #333; }
 
@@ -161,26 +158,40 @@
         .add-comment-box input { flex: 1; border: none; padding: 10px 15px; border-radius: 20px; font-size: 0.9rem; outline: none; background: white; border: 1px solid #eee; }
         .add-comment-box button { background: transparent; color: var(--christmas-red); border: none; font-weight: bold; cursor: pointer; }
 
-        .decoration { position: fixed; z-index: -1; opacity: 0.5; pointer-events: none; }
-        /* GÜNCELLENDİ: Daha canlı bir yeşil renk kullanıldı */
-        .tree-left { top: 10%; left: 2%; font-size: 6rem; color: #1db954; }
-        .tree-right { bottom: 10%; right: 2%; font-size: 8rem; color: #1db954; }
-
-        /* YENİ: Hediye Kutusu Stilleri */
-        .gift-box {
-            position: fixed;
-            z-index: -1;
+        /* FOOTER SIGNATURE STYLES (GÜNCELLENDİ) */
+        .app-footer { 
+            position: fixed; 
+            bottom: 5px; 
+            left: 0; 
+            width: 100%; 
+            text-align: center; 
+            color: var(--text-main); 
+            font-size: 0.8rem; 
+            background: none; 
+            z-index: 10;
             opacity: 0.6;
-            pointer-events: none;
-            color: var(--christmas-red);
-            font-size: 3rem;
+            pointer-events: none; /* Tıklamalar arkaya geçsin */
         }
-        /* Farklı boyutlarda ve renklerde kutular oluşturmak için CSS hilesi */
+        .creator-tag { 
+            font-weight: 800; color: var(--text-main); text-decoration: none; 
+            transition: all 0.3s ease; display: inline-block;
+            pointer-events: auto; /* Sadece linke tıklanabilsin */
+        }
+        .creator-tag:hover { 
+            color: var(--christmas-red); 
+            text-shadow: 0 0 10px rgba(212, 36, 38, 0.8), 0 0 20px rgba(255, 183, 178, 0.6); 
+            transform: scale(1.1);
+        }
+
+        .decoration { position: fixed; z-index: -1; opacity: 0.5; pointer-events: none; }
+        .tree-left { top: 10%; left: 2%; font-size: 6rem; color: #0e4d2d; }
+        .tree-right { bottom: 10%; right: 2%; font-size: 8rem; color: #0e4d2d; }
+
+        .gift-box { position: fixed; z-index: -1; opacity: 0.6; pointer-events: none; color: var(--christmas-red); font-size: 3rem; }
         .gift-box.one { bottom: 5%; left: 8%; color: var(--christmas-red); font-size: 3.5rem; }
         .gift-box.two { bottom: 12%; left: 4%; color: #ffc107; font-size: 2.5rem; transform: rotate(-15deg); }
         .gift-box.three { bottom: 8%; right: 12%; color: #2f5a2f; font-size: 3rem; transform: rotate(10deg); }
         .gift-box.four { bottom: 15%; right: 6%; color: var(--accent); font-size: 2.8rem; }
-
 
         @media (max-width: 768px) {
             .decoration, .gift-box { display: none; }
@@ -195,12 +206,10 @@
         <div class="login-card" id="loginForm">
             <h2><i class="fas fa-snowflake"></i> PineBry</h2>
             <input type="text" id="loginUser" class="login-input" placeholder="Kullanıcı Adı">
-            
             <div class="password-wrapper">
                 <input type="password" id="loginPass" class="login-input" placeholder="Şifre">
                 <i class="fas fa-eye password-toggle-icon" onclick="togglePassword('loginPass', this)"></i>
             </div>
-
             <button class="login-btn" onclick="login()">Giriş Yap</button>
             <div class="toggle-auth" onclick="toggleAuth('register')">Hesabın yok mu? Kayıt Ol</div>
             <div style="margin-top:10px; font-size:0.8rem; cursor:pointer;" onclick="document.getElementById('loginOverlay').style.display='none'">Kapat (Misafir Modu)</div>
@@ -209,12 +218,10 @@
         <div class="login-card" id="registerForm" style="display:none;">
             <h2>Kayıt Ol</h2>
             <input type="text" id="regUser" class="login-input" placeholder="Kullanıcı Adı Seç">
-            
             <div class="password-wrapper">
                 <input type="password" id="regPass" class="login-input" placeholder="Şifre Belirle (Min 8 Karakter)">
                 <i class="fas fa-eye password-toggle-icon" onclick="togglePassword('regPass', this)"></i>
             </div>
-
             <button class="login-btn" onclick="register()">Kayıt Ol</button>
             <div class="toggle-auth" onclick="toggleAuth('login')">Zaten hesabın var mı? Giriş Yap</div>
             <div style="margin-top:10px; font-size:0.8rem; cursor:pointer;" onclick="document.getElementById('loginOverlay').style.display='none'">Kapat (Misafir Modu)</div>
@@ -233,7 +240,6 @@
     <div class="gift-box two"><i class="fas fa-gift"></i></div>
     <div class="gift-box three"><i class="fas fa-gift"></i></div>
     <div class="gift-box four"><i class="fas fa-gift"></i></div>
-
     <div class="decoration tree-left"><i class="fas fa-tree"></i></div>
     <div class="decoration tree-right"><i class="fas fa-tree"></i></div>
 
@@ -262,7 +268,6 @@
                     <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Çıkış</button>
                 </div>
             </div>
-
             <ul class="category-list" id="categoryContainer"></ul>
         </aside>
 
@@ -271,6 +276,10 @@
             <div id="feedArea"></div>
         </main>
     </div>
+
+    <footer class="app-footer">
+        Made by <a href="#" class="creator-tag">@hsyntznr</a>
+    </footer>
 
     <script>
         // --- 1. FIREBASE AYARLARI ---
@@ -494,7 +503,7 @@
 
                 if(post.isAnonymous) {
                     displayName = "Anonim";
-                    displayAvatar = "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs="; // Siyah Pixel
+                    displayAvatar = "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs="; 
                 }
 
                 const catInfo = categories.find(c => c.id === post.category);
@@ -540,7 +549,7 @@
                     
                     <div id="comment-wrap-${post.id}" class="comments-wrap">
                         ${commentsHtml}
-                        <div class="add-comment-box"><input type="text" id="c-input-${post.id}" placeholder="Yorum ekle..."><button onclick="addComment('${post.id}')">Yolla</button></div>
+                        <div class="add-comment-box"><input type="text" id="c-input-${post.id}" placeholder="Yorum ekle..."><button onclick="addComment(${post.id})">Yolla</button></div>
                     </div>
                 </article>`;
                 feedArea.insertAdjacentHTML('beforeend', postHTML); 
@@ -552,7 +561,7 @@
             const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w\-]+)(?:\S+)?/g;
             formatted = formatted.replace(ytRegex, '<div class="video-container"><iframe src="https://www.youtube.com/embed/$1" frameborder="0" allowfullscreen></iframe></div>');
             const spotifyRegex = /(?:https?:\/\/)?(?:open\.spotify\.com\/)(track|album|playlist)\/([a-zA-Z0-9]+)(?:\?\S+)?/g;
-            formatted = formatted.replace(spotifyRegex, '<iframe style="border-radius:12px; margin-top:10px;" src="http://googleusercontent.com/spotify.com/1" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>');
+            formatted = formatted.replace(spotifyRegex, '<iframe style="border-radius:12px; margin-top:10px;" src="https://open.spotify.com/embed/$1/$2" width="100%" height="80" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>');
             formatted = formatted.replace(/\n/g, '<br>');
             return formatted;
         }
